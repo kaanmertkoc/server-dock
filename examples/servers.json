@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "categories": ["Production", "Home Lab"],
+  "servers": [
+    {"id": "web", "name": "Web server", "host": "web.example.com", "username": "deploy", "port": null, "category": "Production"},
+    {"id": "db", "name": "Database", "host": "db.example.com", "username": "", "port": null, "category": "Production"},
+    {"id": "staging", "name": "Staging", "host": "192.0.2.42", "username": "deploy", "port": 2222, "category": "Production"},
+    {"id": "nas", "name": "Home NAS", "host": "home-nas", "username": "", "port": null, "category": "Home Lab"},
+    {"id": "pi", "name": "Raspberry Pi", "host": "pi.local", "username": "", "port": null, "category": "Home Lab"}
+  ]
+}

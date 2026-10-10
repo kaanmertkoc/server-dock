@@ -1,0 +1,4 @@
+include themes.json requirements.txt test_dock.py test_settings.py
+include *.command
+recursive-include docs *.svg *.py
+recursive-include examples *.json

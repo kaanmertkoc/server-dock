@@ -1,0 +1,18 @@
+{
+  "default": "textual-dark",
+  "themes": {
+    "kaan-ocean": {
+      "dark": true,
+      "primary": "#49A6B8",
+      "secondary": "#7395C5",
+      "accent": "#E8B86D",
+      "foreground": "#E1EAF2",
+      "background": "#15232D",
+      "surface": "#203540",
+      "panel": "#29414C",
+      "success": "#85BE9B",
+      "warning": "#E8B86D",
+      "error": "#E08282"
+    }
+  }
+}
