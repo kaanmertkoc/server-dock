@@ -18,6 +18,8 @@ server-dock
 
 Or use `pipx install .`. Both install an isolated terminal command that works
 from any directory. Update from a newer checkout with `uv tool install --reinstall .`.
+Check the installed build with `server-dock --version`. If you used Kaan's Dock,
+launch `server-dock` now; the old `kaans-dock` command runs a separate installation.
 
 After installing, you can also double-click **Server Dock.command** in Finder
 to open it in Terminal. Move that launcher wherever is convenient.
@@ -45,7 +47,7 @@ Existing Kaan's Dock users keep their address book, themes, and display name.
 | `s` | Connect with SSH; disconnect to return |
 | `c` / `y` | Copy the address or SSH command |
 | `f` / `m` / `r` | Create a category, move a server, or rename a category |
-| `t` | Choose a theme |
+| `t` | Choose and remember a theme |
 | `?` / `q` | Toggle help or quit |
 
 Add an IP address, hostname, or alias from `~/.ssh/config`. Leave username and
@@ -58,7 +60,8 @@ Your address book and preferences live in `~/.config/server-dock/`:
 
 - `servers.json` — servers and categories
 - `settings.json` — your dock's display name
-- `themes.json` — startup theme and custom palettes; edit and restart
+- `themes.json` — saved theme choice and custom palettes; choosing a theme saves it
+  automatically for future launches. You can also edit palettes here and restart.
 
 Override individual files with `--data`, `--settings`, or `--themes`.
 Existing `~/.config/kaans-dock/` server and theme files are used when the new

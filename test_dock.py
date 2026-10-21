@@ -14,7 +14,7 @@ from textual.command import CommandPalette
 from textual.widgets import Button, Input, Label, OptionList, Select, Static, Tree
 
 from server_dock import (Dialog, Dock, clean_data, clean_port, clean_server, host_type,
-                  init_themes, load_data, load_themes, save_data, ssh_args)
+                  init_themes, load_data, load_themes, save_data, save_theme, ssh_args)
 
 
 def server(**changes):
@@ -462,10 +462,83 @@ class InterfaceTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertEqual(app.theme, "textual-light")
             self.assertNotIsInstance(app.screen, CommandPalette)
-            self.assertEqual(json.loads(theme_path.read_text()), config)
+            self.assertEqual(json.loads(theme_path.read_text()), {**config, "default": "textual-light"})
+            self.assertEqual(theme_path.stat().st_mode & 0o777, 0o600)
             self.assertFalse(self.path.exists())
             await pilot.press("ctrl+p")
             self.assertIsInstance(app.screen, CommandPalette)
+
+    async def test_theme_selection_survives_restart_and_cancel_keeps_choice(self):
+        theme_path = self.path.with_name("themes.json")
+        config = {"default": "textual-dark", "themes": {"my-ocean": {"primary": "#49A6B8"}}}
+        theme_path.write_text(json.dumps(config))
+        save_data(self.path, data())
+        before = self.path.read_bytes()
+        for choice in ["nord", "my-ocean"]:
+            app = Dock(self.path, themes_path=theme_path)
+            async with app.run_test() as pilot:
+                await pilot.press("t")
+                await pilot.press(*choice, "enter")
+                await pilot.pause()
+                self.assertEqual(app.theme, choice)
+                self.assertEqual(json.loads(theme_path.read_text()), {**config, "default": choice})
+            restarted = Dock(self.path, themes_path=theme_path)
+            async with restarted.run_test() as pilot:
+                self.assertEqual(restarted.theme, choice)
+                saved = theme_path.read_bytes()
+                await pilot.press("t")
+                await pilot.press(*"textual-light", "escape")
+                await pilot.pause()
+                self.assertEqual(restarted.theme, choice)
+                self.assertEqual(theme_path.read_bytes(), saved)
+        self.assertEqual(self.path.read_bytes(), before)
+
+    async def test_startup_does_not_rewrite_theme_config(self):
+        theme_path = self.path.with_name("themes.json")
+        contents = '{"default":"nord", "themes":{}}'
+        theme_path.write_text(contents)
+        app = Dock(self.path, themes_path=theme_path)
+        with patch("server_dock.write_atomic") as write:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                self.assertEqual(app.theme, "nord")
+            write.assert_not_called()
+        self.assertEqual(theme_path.read_text(), contents)
+
+    async def test_theme_save_failure_warns_and_preserves_previous_config(self):
+        theme_path = self.path.with_name("themes.json")
+        contents = '{"default":"textual-dark","themes":{}}'
+        theme_path.write_text(contents)
+        app = Dock(self.path, themes_path=theme_path)
+        async with app.run_test() as pilot:
+            with patch("server_dock.os.replace", side_effect=OSError("Disk error")):
+                await pilot.press("t")
+                await pilot.press(*"nord", "enter")
+                await pilot.pause()
+            self.assertEqual(app.theme, "nord")
+            self.assertIn("Cannot save theme", str(app.query_one("#status", Static).render()))
+            self.assertIn("Disk error", str(app.query_one("#status", Static).render()))
+        self.assertEqual(theme_path.read_text(), contents)
+        self.assertEqual(list(theme_path.parent.iterdir()), [theme_path])
+
+    async def test_theme_choice_creates_missing_config_but_preserves_corrupt_config(self):
+        theme_path = self.path.with_name("themes.json")
+        for contents in [None, "{broken"]:
+            with self.subTest(contents=contents):
+                if contents is not None:
+                    theme_path.write_text(contents)
+                app = Dock(self.path, themes_path=theme_path)
+                async with app.run_test() as pilot:
+                    await pilot.press("t")
+                    await pilot.press(*"nord", "enter")
+                    await pilot.pause()
+                    self.assertEqual(app.theme, "nord")
+                    if contents is None:
+                        self.assertEqual(json.loads(theme_path.read_text()), {"default": "nord", "themes": {}})
+                    else:
+                        self.assertEqual(theme_path.read_text(), contents)
+                        self.assertIn("Cannot save theme", str(app.query_one("#status", Static).render()))
+                self.assertFalse(self.path.exists())
 
     async def test_bad_theme_config_warns_without_affecting_server_data(self):
         save_data(self.path, data())
@@ -536,6 +609,27 @@ class ThemeConfigTests(unittest.TestCase):
         self.path.write_bytes(b"\xff\xfe")
         self.assertEqual(load_themes(self.path)[:2], ("textual-dark", []))
         self.assertEqual(self.path.read_bytes(), b"\xff\xfe")
+
+    def test_saving_theme_preserves_palettes_edited_while_app_is_open(self):
+        self.path.write_text('{"default":"textual-dark","themes":{}}')
+        app = Dock(self.path.with_name("servers.json"), themes_path=self.path)
+        config = {"default": "textual-dark", "themes": {"added": {"primary": "#123456"}}}
+        self.path.write_text(json.dumps(config))
+        save_theme(app.themes_path, "nord")
+        self.assertEqual(json.loads(self.path.read_text()), {**config, "default": "nord"})
+
+    def test_saving_theme_preserves_broken_symlink_and_rejects_unknown_theme(self):
+        self.path.symlink_to(self.path.with_name("missing.json"))
+        with self.assertRaises(ValueError):
+            save_theme(self.path, "nord")
+        self.assertTrue(self.path.is_symlink())
+        self.assertFalse(self.path.exists())
+        self.path.unlink()
+        contents = '{"default":"textual-dark","themes":{}}'
+        self.path.write_text(contents)
+        with self.assertRaises(ValueError):
+            save_theme(self.path, "unknown-theme")
+        self.assertEqual(self.path.read_text(), contents)
 
     def test_theme_migration_preserves_customizations_and_owner_only_permissions(self):
         source = self.path.with_name("legacy-themes.json")

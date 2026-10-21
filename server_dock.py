@@ -25,6 +25,8 @@ from textual.theme import BUILTIN_THEMES, Theme
 from textual.widgets import Button, Input, Label, Select, Static, Tree
 
 
+__version__ = "0.1.1"
+
 CONFIG_DIR = Path.home() / ".config" / "server-dock"
 DATA_PATH = CONFIG_DIR / "servers.json"
 LEGACY_DIR = Path.home() / ".config" / "kaans-dock"
@@ -141,31 +143,54 @@ def unique_object(pairs):
     return result
 
 
-def load_themes(path):
-    """Optional configuration: validate everything before registering any palette."""
+def clean_themes(config):
+    """Validate everything before registering or saving any palette."""
     colors = {"primary", "secondary", "accent", "foreground", "background",
               "surface", "panel", "boost", "success", "warning", "error"}
+    require(isinstance(config, dict) and set(config) == {"default", "themes"}, "Expected default and themes fields.")
+    require(isinstance(config["themes"], dict), "Themes must be a mapping of names to palettes.")
+    themes = []
+    for name, palette in config["themes"].items():
+        require(re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name) and name not in BUILTIN_THEMES, f"Invalid or reserved theme name: {name}")
+        require(isinstance(palette, dict) and "primary" in palette, f"Theme {name} needs a palette with a primary color.")
+        require(not set(palette) - colors - {"dark"} and type(palette.get("dark", True)) is bool,
+                f"Theme {name}: unsupported fields or non-boolean dark value.")
+        for field, value in palette.items():
+            if field != "dark":
+                require(isinstance(value, str), f"Theme {name}: {field} must be a color string.")
+                Color.parse(value)
+        themes.append(Theme(name=name, **palette))
+    default = config["default"]
+    require(isinstance(default, str) and default in set(BUILTIN_THEMES) | set(config["themes"]),
+            "Default theme is not a built-in or configured theme.")
+    return default, themes
+
+
+def read_theme_config(path):
+    config = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+    default, themes = clean_themes(config)
+    return config, default, themes
+
+
+def load_themes(path):
     try:
-        config = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
-        require(isinstance(config, dict) and set(config) == {"default", "themes"}, "Expected default and themes fields.")
-        require(isinstance(config["themes"], dict), "Themes must be a mapping of names to palettes.")
-        themes = []
-        for name, palette in config["themes"].items():
-            require(re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name) and name not in BUILTIN_THEMES, f"Invalid or reserved theme name: {name}")
-            require(isinstance(palette, dict) and "primary" in palette, f"Theme {name} needs a palette with a primary color.")
-            require(not set(palette) - colors - {"dark"} and type(palette.get("dark", True)) is bool,
-                    f"Theme {name}: unsupported fields or non-boolean dark value.")
-            for field, value in palette.items():
-                if field != "dark":
-                    require(isinstance(value, str), f"Theme {name}: {field} must be a color string.")
-                    Color.parse(value)
-            themes.append(Theme(name=name, **palette))
-        default = config["default"]
-        require(isinstance(default, str) and default in set(BUILTIN_THEMES) | set(config["themes"]),
-                "Default theme is not a built-in or configured theme.")
+        _, default, themes = read_theme_config(path)
         return default, themes, ""
     except (OSError, ValueError, ColorParseError, RecursionError) as error:
         return "textual-dark", [], f"Cannot load themes from {path}: {error}. Using textual-dark."
+
+
+def save_theme(path, name):
+    # Re-read to preserve palettes edited since startup. Never replace corrupt config.
+    try:
+        config, _, _ = read_theme_config(path)
+    except FileNotFoundError:
+        if path.is_symlink():
+            raise ValueError("The themes file is a broken symbolic link.") from None
+        config = {"default": "textual-dark", "themes": {}}
+    config["default"] = name
+    clean_themes(config)
+    write_atomic(path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
 
 
 def load_data(path):
@@ -383,7 +408,8 @@ class Dock(App):
         self.title = clean_name(name, "Dock name")
         self.path = Path(path).expanduser()
         self.data = load_data(self.path)
-        self.default_theme, self.custom_themes, self.theme_warning = load_themes(Path(themes_path))
+        self.themes_path = Path(themes_path).expanduser()
+        self.default_theme, self.custom_themes, self.theme_warning = load_themes(self.themes_path)
         self.help_visible = True
         self.nodes = {}
 
@@ -413,6 +439,21 @@ class Dock(App):
         self.status(self.theme_warning or f"Saved locally: {self.path}")
         if self.theme_warning:
             self.notify(self.theme_warning, severity="warning", timeout=10)
+        self.theme_changed_signal.subscribe(self, self.persist_theme)
+
+    def persist_theme(self, theme):
+        # Ignore startup and stale notifications queued before the current choice.
+        if theme.name == self.default_theme or theme.name != self.theme:
+            return
+        try:
+            save_theme(self.themes_path, theme.name)
+        except (OSError, ValueError, ColorParseError, RecursionError) as error:
+            message = f"Cannot save theme to {self.themes_path}: {error}. Using it for this session only."
+            self.status(message)
+            self.notify(message, severity="warning", timeout=10)
+        else:
+            self.default_theme = theme.name
+            self.status(f"Theme saved: {theme.name}")
 
     def on_resize(self, event):
         columns = 3 if event.size.width >= 80 else 2 if event.size.width >= 55 else 1
@@ -596,6 +637,7 @@ class Dock(App):
 def main(argv=None):
     default_data, default_themes = default_paths()
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--data", type=Path, default=default_data, help="JSON file (default: %(default)s)")
     parser.add_argument("--themes", type=Path, default=default_themes, help="Theme configuration (default: %(default)s)")
     parser.add_argument("--settings", type=Path, default=SETTINGS_PATH, help="Display settings (default: %(default)s)")
