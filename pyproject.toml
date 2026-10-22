@@ -1,16 +1,16 @@
 [build-system]
-requires = ["setuptools>=77"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "server-dock"
-dynamic = ["version"]
+version = "0.1.2"
 description = "A small, keyboard-first SSH address book for your terminal"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["textual==8.2.8"]
+dependencies = ["textual==8.2.8", "rich==15.0.0"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -28,5 +28,9 @@ py-modules = ["server_dock"]
 [tool.setuptools.data-files]
 "share/server-dock" = ["themes.json"]
 
-[tool.setuptools.dynamic]
-version = {attr = "server_dock.__version__"}
+[dependency-groups]
+build = ["setuptools==84.0.0"]
+
+[tool.uv]
+required-version = "==0.12.8"
+exclude-newer = "7 days"

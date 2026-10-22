@@ -631,8 +631,8 @@ class ThemeConfigTests(unittest.TestCase):
             save_theme(self.path, "unknown-theme")
         self.assertEqual(self.path.read_text(), contents)
 
-    def test_theme_migration_preserves_customizations_and_owner_only_permissions(self):
-        source = self.path.with_name("legacy-themes.json")
+    def test_theme_initialization_preserves_customizations_and_owner_only_permissions(self):
+        source = self.path.with_name("source-themes.json")
         contents = '{"default":"nord","themes":{}}\n'
         source.write_text(contents)
         init_themes(self.path, source)
@@ -644,7 +644,7 @@ class ThemeConfigTests(unittest.TestCase):
         self.assertEqual(source.read_text(), contents)
 
     def test_theme_initialization_never_overwrites_a_racing_write_or_broken_symlink(self):
-        source = self.path.with_name("legacy-themes.json")
+        source = self.path.with_name("source-themes.json")
         source.write_text('{"default":"textual-dark","themes":{}}')
         link = os.link
         def racing_link(temporary, target):
@@ -661,7 +661,7 @@ class ThemeConfigTests(unittest.TestCase):
         self.assertFalse(symlink.exists())
 
     def test_theme_initialization_failure_leaves_no_partial_configuration(self):
-        source = self.path.with_name("legacy-themes.json")
+        source = self.path.with_name("source-themes.json")
         source.write_text('{"default":"textual-dark","themes":{}}')
         with patch("server_dock.os.link", side_effect=OSError("Disk error")):
             with self.assertRaises(OSError):

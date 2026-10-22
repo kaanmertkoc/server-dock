@@ -1,4 +1,4 @@
-"""Regressions for the rename, saved titles, and existing address books."""
+"""Regressions for saved display names and explicit configuration paths."""
 
 import json
 from pathlib import Path
@@ -46,36 +46,35 @@ class SettingsTests(unittest.TestCase):
             dock.load_settings(self.settings)
         self.assertTrue(self.settings.is_symlink())
 
-    def test_legacy_paths_and_new_paths_take_precedence(self):
-        legacy = self.root / "kaans-dock"
+    def test_startup_uses_current_config_directory(self):
         current = self.root / "server-dock"
-        legacy.mkdir()
-        current.mkdir()
-        with patch.object(dock, "LEGACY_DIR", legacy), \
-                patch.object(dock, "DATA_PATH", current / "servers.json"), \
-                patch.object(dock, "USER_THEMES", current / "themes.json"):
-            self.assertEqual(dock.default_paths(), (current / "servers.json", current / "themes.json"))
-            for filename in ["servers.json", "themes.json"]:
-                (legacy / filename).write_text("legacy")
-            self.assertEqual(dock.default_paths(), (legacy / "servers.json", legacy / "themes.json"))
-            for filename in ["servers.json", "themes.json"]:
-                (current / filename).symlink_to(current / "missing")
-            self.assertEqual(dock.default_paths(), (current / "servers.json", current / "themes.json"))
-            self.assertEqual((legacy / "servers.json").read_text(), "legacy")
-
-    def test_legacy_startup_preserves_personal_title(self):
-        legacy = self.root / "kaans-dock"
-        legacy.mkdir()
-        data = legacy / "servers.json"
-        dock.save_data(data, {"version": 1, "categories": [], "servers": []})
-        with patch.object(dock, "LEGACY_DIR", legacy), \
-                patch.object(dock, "default_paths", return_value=(data, dock.THEMES_PATH)), \
+        data, themes = current / "servers.json", current / "themes.json"
+        with patch.object(dock, "DATA_PATH", data), \
+                patch.object(dock, "USER_THEMES", themes), \
+                patch.object(dock, "SETTINGS_PATH", self.settings), \
                 patch.object(dock.Dock, "run") as run, \
                 patch.object(dock, "Dock", wraps=dock.Dock) as app:
-            self.assertEqual(dock.main(["--settings", str(self.settings)]), 0)
-            self.assertEqual(app.call_args.kwargs["name"], "Kaan's Dock")
+            self.assertEqual(dock.main([]), 0)
+            self.assertEqual(app.call_args.args, (data,))
+            self.assertEqual(app.call_args.kwargs, {"themes_path": themes, "name": "Server Dock"})
             run.assert_called_once()
+        self.assertTrue(themes.is_file())
+        self.assertFalse(data.exists())
         self.assertFalse(self.settings.exists())
+
+    def test_explicit_paths_and_saved_name_are_respected(self):
+        data = self.root / "custom-servers.json"
+        themes = self.root / "custom-themes.json"
+        dock.save_data(data, {"version": 1, "categories": ["My servers"], "servers": []})
+        themes.write_text('{"default":"nord","themes":{}}')
+        self.settings.write_text('{"name":"My Dock"}')
+        before = {p: p.read_bytes() for p in [data, themes, self.settings]}
+        with patch.object(dock.Dock, "run") as run, patch.object(dock, "Dock", wraps=dock.Dock) as app:
+            self.assertEqual(dock.main(["--data", str(data), "--themes", str(themes),
+                                       "--settings", str(self.settings)]), 0)
+            self.assertEqual(app.call_args.kwargs, {"themes_path": themes, "name": "My Dock"})
+            run.assert_called_once()
+        self.assertEqual({p: p.read_bytes() for p in before}, before)
 
 
 class DisplayTests(unittest.IsolatedAsyncioTestCase):

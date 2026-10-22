@@ -11,25 +11,40 @@ built with [Textual](https://textual.textualize.io/).
 ## Install
 
 Requires **Python 3.10+**, macOS, and your usual SSH setup.
-Install with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+From a clean checkout of a reviewed commit, using [uv](https://docs.astral.sh/uv/getting-started/installation/) **0.12.8**:
 
 ```sh
-uv tool install git+https://github.com/kaanmertkoc/server-dock
+./scripts/install.sh <full-reviewed-commit-sha>
 server-dock
 ```
 
-From a checkout, `uv tool install .` or `pipx install .` also works.
-To update, repeat the install command with `--reinstall`; check your build with
-`server-dock --version`. The [Finder launcher](Server%20Dock.command) opens it in Terminal.
+The installer verifies locked dependency hashes and builds the app offline.
+See [installation steps and dependency policy](docs/dependencies.md); updates require
+a newly reviewed commit. Check your build with `server-dock --version`.
+The [Finder launcher](Server%20Dock.command) opens it in Terminal.
 
 ## Make it yours
 
 Press **`t`** to browse themes. Your choice is saved for the next launch.
 Pick a built-in theme or define your own palette in `themes.json`.
 
-| Nord | Dracula | Textual Light |
-| :---: | :---: | :---: |
-| ![Server Dock in Nord](docs/screenshots/theme-nord.svg) | ![Server Dock in Dracula](docs/screenshots/theme-dracula.svg) | ![Server Dock in Textual Light](docs/screenshots/theme-light.svg) |
+**Nord**
+
+![Server Dock in Nord](docs/screenshots/theme-nord.svg)
+
+<details>
+<summary>Dracula — click to preview</summary>
+
+![Server Dock in Dracula](docs/screenshots/theme-dracula.svg)
+
+</details>
+
+<details>
+<summary>Textual Light — click to preview</summary>
+
+![Server Dock in Textual Light](docs/screenshots/theme-light.svg)
+
+</details>
 
 Give your dock a name, too:
 
@@ -37,8 +52,7 @@ Give your dock a name, too:
 server-dock --name "Kaan's Dock"
 ```
 
-The name is remembered; the command stays `server-dock`. Existing Kaan's Dock
-users keep their data and preferences—launch `server-dock` to use this version.
+The name is remembered; the command stays `server-dock`.
 
 ## Use
 
@@ -65,9 +79,8 @@ Everything lives in `~/.config/server-dock/`:
 - `settings.json` — your dock's display name
 - `themes.json` — saved theme and custom palettes; restart after editing palettes
 
-Override paths with `--data`, `--settings`, or `--themes`. Existing
-`~/.config/kaans-dock/` server and theme files are used when the new files don't
-exist; migration never moves or overwrites them.
+Override paths with `--data`, `--settings`, or `--themes`. Moving from Kaan's Dock?
+[Copy your existing data first](docs/dependencies.md#existing-kaans-dock-data).
 
 Uses your installed `ssh`, stores no passwords or keys, and saves changes atomically.
 Clipboard uses macOS `pbcopy`. Use one running instance per address book.
@@ -75,15 +88,15 @@ Clipboard uses macOS `pbcopy`. Use one running instance per address book.
 ## Development
 
 ```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-python -m unittest -v
-server-dock --data examples/servers.json --settings /tmp/server-dock-demo-settings.json
+uv sync --locked --no-default-groups --group build --no-install-project --no-build
+uv sync --locked --no-default-groups --group build --no-build-isolation --offline
+.venv/bin/python -m unittest -v
+.venv/bin/server-dock --data examples/servers.json --settings /tmp/server-dock-demo-settings.json
 ```
 
-Build with `uv build`; refresh screenshots with `python docs/capture_screenshots.py`.
-Screenshots use fictional servers and temporary settings. Contributions are welcome.
+See [offline packaging](docs/dependencies.md#development-and-packaging); refresh screenshots
+with `.venv/bin/python docs/capture_screenshots.py` using fictional servers and temporary settings.
+Contributions are welcome.
 
 ## License
 

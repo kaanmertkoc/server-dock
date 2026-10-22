@@ -25,11 +25,10 @@ from textual.theme import BUILTIN_THEMES, Theme
 from textual.widgets import Button, Input, Label, Select, Static, Tree
 
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 CONFIG_DIR = Path.home() / ".config" / "server-dock"
 DATA_PATH = CONFIG_DIR / "servers.json"
-LEGACY_DIR = Path.home() / ".config" / "kaans-dock"
 THEMES_PATH = Path(__file__).resolve().with_name("themes.json")
 USER_THEMES = DATA_PATH.with_name("themes.json")
 SETTINGS_PATH = CONFIG_DIR / "settings.json"
@@ -50,26 +49,13 @@ def clean_name(value, label="Name"):
     return value.strip()
 
 
-def default_paths():
-    """Keep existing users on their address book without copying private data."""
-    legacy_data = LEGACY_DIR / "servers.json"
-    legacy_themes = LEGACY_DIR / "themes.json"
-    data = DATA_PATH if DATA_PATH.exists() or DATA_PATH.is_symlink() else legacy_data
-    if not data.exists() and not data.is_symlink():
-        data = DATA_PATH
-    themes = USER_THEMES
-    if not themes.exists() and not themes.is_symlink() and (legacy_themes.exists() or legacy_themes.is_symlink()):
-        themes = legacy_themes
-    return data, themes
-
-
-def load_settings(path, default_name="Server Dock"):
+def load_settings(path):
     try:
         settings = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
     except FileNotFoundError:
         if path.is_symlink():
             raise ValueError("The settings file is a broken symbolic link.") from None
-        return {"name": default_name}
+        return {"name": "Server Dock"}
     require(isinstance(settings, dict) and set(settings) == {"name"}, "Settings must contain a name field.")
     return {"name": clean_name(settings["name"], "Dock name")}
 
@@ -635,28 +621,26 @@ class Dock(App):
 
 
 def main(argv=None):
-    default_data, default_themes = default_paths()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument("--data", type=Path, default=default_data, help="JSON file (default: %(default)s)")
-    parser.add_argument("--themes", type=Path, default=default_themes, help="Theme configuration (default: %(default)s)")
+    parser.add_argument("--data", type=Path, default=DATA_PATH, help="JSON file (default: %(default)s)")
+    parser.add_argument("--themes", type=Path, default=USER_THEMES, help="Theme configuration (default: %(default)s)")
     parser.add_argument("--settings", type=Path, default=SETTINGS_PATH, help="Display settings (default: %(default)s)")
     parser.add_argument("--name", help="Set and remember your dock's display name")
     args = parser.parse_args(argv)
     settings_path = args.settings.expanduser()
     try:
-        default_name = "Kaan's Dock" if default_data == LEGACY_DIR / "servers.json" else "Server Dock"
-        settings = load_settings(settings_path, default_name)
+        settings = load_settings(settings_path)
         if args.name is not None:
             settings["name"] = clean_name(args.name, "Dock name")
     except (OSError, ValueError, RecursionError) as error:
         print(f"Cannot load display settings from {settings_path}: {error}", file=sys.stderr)
         return 1
     try:
-        # Migrate legacy/source palettes once; installed wheels ship the same example.
+        # Initialize the bundled palettes once, without replacing user preferences.
         if args.themes == USER_THEMES:
             try:
-                init_themes()
+                init_themes(args.themes)
             except (OSError, ValueError) as error:
                 print(f"Could not initialize themes: {error}", file=sys.stderr)
         app = Dock(args.data, themes_path=args.themes.expanduser(), name=settings["name"])
