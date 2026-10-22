@@ -13,10 +13,6 @@ jobs:
     strategy:
       matrix:
         python: ["3.10", "3.12", "3.14"]
-    env:
-      SERVER_DOCK_INSTALL_DIR: ${{ runner.temp }}/server-dock-install
-      SERVER_DOCK_BIN_DIR: ${{ runner.temp }}/server-dock-bin
-      SERVER_DOCK_PYTHON: python
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -30,6 +26,10 @@ jobs:
           checksum: "2e2b37e9811e17675a9e70bed5e1a58fc8c0388be63d751d72cc735188c149ff"
           enable-cache: "false"
       - name: Install the checked-out commit with verified dependencies
+        env:
+          SERVER_DOCK_INSTALL_DIR: ${{ runner.temp }}/server-dock-install
+          SERVER_DOCK_BIN_DIR: ${{ runner.temp }}/server-dock-bin
+          SERVER_DOCK_PYTHON: python
         run: |
           ./scripts/install.sh "$(git rev-parse HEAD)"
           dirname "$(readlink "$SERVER_DOCK_BIN_DIR/server-dock")" >> "$GITHUB_PATH"
