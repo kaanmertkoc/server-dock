@@ -11,7 +11,7 @@ built with [Textual](https://textual.textualize.io/).
 ## Install
 
 Requires **Python 3.10+**, macOS, and your usual SSH setup.
-From a clean checkout of a reviewed commit, using [uv](https://docs.astral.sh/uv/getting-started/installation/) **0.12.8**:
+From a clean checkout of a reviewed commit, using [uv](https://docs.astral.sh/uv/getting-started/installation/) **0.13.5**:
 
 ```sh
 ./scripts/install.sh <full-reviewed-commit-sha>

@@ -1,7 +1,7 @@
 # Dependency policy
 
 `uv.lock` records exact versions and SHA-256 hashes for the complete runtime and
-build dependency tree. The supported installer uses uv **0.12.8**, refuses a dirty
+build dependency tree. The supported installer uses uv **0.13.5**, refuses a dirty
 checkout or mismatched commit, and installs third-party wheels with `--locked`
 and `--no-build` into a fresh environment. It then builds only Server Dock,
 offline, with the locked setuptools backend. The executable changes only after
@@ -10,7 +10,7 @@ installation succeeds. Existing environments are retained under
 
 ## Install a reviewed revision
 
-Install Python 3.10+ and uv 0.12.8 from their official distributions. Review the
+Install Python 3.10+ and uv 0.13.5 from their official distributions. Review the
 source and lockfile, choose a full 40-character commit SHA, then:
 
 ```sh
@@ -39,13 +39,13 @@ server-dock
 │   ├── rich 15.0.0 → markdown-it-py, pygments
 │   ├── markdown-it-py 4.2.0 [linkify] → mdurl 0.1.2, linkify-it-py 2.2.0
 │   ├── mdit-py-plugins 0.6.1 → markdown-it-py
-│   ├── platformdirs 4.13.0 (4.12.4 on Python 3.10)
+│   ├── platformdirs 4.13.5 (4.12.4 on Python 3.10)
 │   ├── pygments 2.21.0
 │   └── typing-extensions 4.16.0
 └── rich 15.0.0 (shared above)
 ```
 
-The build environment also contains **setuptools 84.0.0**. Optional Textual
+The build environment also contains **setuptools 84.2.1**. Optional Textual
 syntax-highlighting extras are not installed. Python, uv, Git, the operating
 system, and GitHub-hosted runner images remain outside the Python lockfile;
 CI separately pins uv's version and Linux archive checksum.

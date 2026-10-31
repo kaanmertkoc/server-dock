@@ -20,12 +20,13 @@ from textual.app import App, ComposeResult, SuspendNotSupported
 from textual.binding import Binding
 from textual.color import Color, ColorParseError
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.drivers.linux_driver import LinuxDriver
 from textual.screen import ModalScreen
 from textual.theme import BUILTIN_THEMES, Theme
 from textual.widgets import Button, Input, Label, Select, Static, Tree
 
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 CONFIG_DIR = Path.home() / ".config" / "server-dock"
 DATA_PATH = CONFIG_DIR / "servers.json"
@@ -234,6 +235,16 @@ def ssh_args(record):
     return args
 
 
+class DockDriver(LinuxDriver):
+    def start_application_mode(self):
+        super().start_application_mode()
+        # Entering an already-active alternate screen can retain another TUI's
+        # scroll margins. A full frame then scrolls away the title and leaves
+        # doubled borders. Reset margins on startup and after SSH suspension.
+        self.write("\x1b[r")
+        self.flush()
+
+
 class ServerTree(Tree):
     BINDINGS = [("enter", "toggle_node", "Toggle category"),
                 ("right", "open_category", "Expand"),
@@ -398,6 +409,10 @@ class Dock(App):
         self.default_theme, self.custom_themes, self.theme_warning = load_themes(self.themes_path)
         self.help_visible = True
         self.nodes = {}
+
+    def get_driver_class(self):
+        driver = super().get_driver_class()
+        return DockDriver if driver is LinuxDriver else driver
 
     def compose(self) -> ComposeResult:
         yield Static(self.title, id="title", markup=False)
